@@ -5,8 +5,11 @@
 //
 // Vercel Environment Variables required:
 //   ZOOM_ACCOUNT_ID, ZOOM_CLIENT_ID, ZOOM_CLIENT_SECRET
-//   ZOOM_EVENT_ID    -> the Meeting ID or Webinar ID (numbers only)
-//   ZOOM_EVENT_TYPE  -> "meeting" or "webinar" (defaults to "meeting")
+//   ZOOM_EVENT_ID    -> the Webinar ID (numbers only)
+//   ZOOM_EVENT_TYPE  -> "webinar"
+
+// Must match the custom question title on the Zoom webinar exactly.
+const PROGRAM_QUESTION = "Any SOIL program you are interested in?";
 
 let cachedToken = null;
 let tokenExpiry = 0;
@@ -60,8 +63,8 @@ module.exports = async (req, res) => {
   try {
     const token = await getZoomToken();
 
-    const type = (process.env.ZOOM_EVENT_TYPE || "meeting").toLowerCase() === "webinar"
-      ? "webinars" : "meetings";
+    const type = (process.env.ZOOM_EVENT_TYPE || "webinar").toLowerCase() === "meeting"
+      ? "meetings" : "webinars";
     const eventId = String(process.env.ZOOM_EVENT_ID || "").replace(/\D/g, "");
 
     const zoomRes = await fetch(
@@ -77,10 +80,8 @@ module.exports = async (req, res) => {
           last_name: lastName,
           email,
           phone,
-          // These titles must match the custom questions set up in the Zoom webinar
           custom_questions: [
-            { title: "Programme of interest", value: programme },
-            { title: "Source", value: source },
+            { title: PROGRAM_QUESTION, value: programme },
           ],
         }),
       }
@@ -92,6 +93,9 @@ module.exports = async (req, res) => {
       console.error("Zoom registration error:", zoomRes.status, data);
       return res.status(502).json({ error: "Registration failed" });
     }
+
+    // Shows up in the Vercel function logs so you can see which channel sent them
+    console.log("Registered:", { email, programme, source });
 
     return res.status(200).json({ ok: true, joinUrl: data.join_url });
   } catch (err) {
